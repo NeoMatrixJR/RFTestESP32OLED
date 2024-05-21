@@ -43,9 +43,11 @@
 
 TwoWire twi = TwoWire(1);
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &twi, OLED_RESET);
+int oledTxtSize = 2;
+int32_t pairedRSSI = 0;
 
 // ESPNow Setup
-#define PEER_ADDRESS "B0:A7:32:D7:98:48" // Replace with the MAC address of the non-OLED board
+// #define PEER_ADDRESS "B0:A7:32:D7:98:48" // Replace with the MAC address of the non-OLED board
 
 
 // Global copy of slave
@@ -61,7 +63,7 @@ void clearAndDisplay(String dspTxt) {
     // Draw bitmap on the screen
     //display.setCursor(1,2);
     display.setCursor(0,0);
-    display.setTextSize(1);
+    display.setTextSize(oledTxtSize);
     display.setTextColor(WHITE);
     // display.setFont(&FreeSans9pt7b);
     display.println(dspTxt);
@@ -73,11 +75,11 @@ void InitESPNow() {
   WiFi.disconnect();
   if (esp_now_init() == ESP_OK) {
     Serial.println("ESPNow Init Success");
-    display.println("ESPNow Init Success");
+    display.println("ESPNow Init Success"); display.display();
   }
   else {
     Serial.println("ESPNow Init Failed");
-    display.println("ESPNow Init Failed");
+    display.println("ESPNow Init Failed"); display.display();
     // Retry InitESPNow, add a counte and then restart?
     // InitESPNow();
     // or Simply Restart
@@ -93,13 +95,14 @@ void ScanForSlave() {
   memset(&slave, 0, sizeof(slave));
 
   Serial.println("");
-  clearAndDisplay("WiFi Setup:");
+  clearAndDisplay("WiFi Setup...");
   if (scanResults == 0) {
     Serial.println("No WiFi devices in AP Mode found");
-    display.println("No WiFi devices in AP Mode found");
+    clearAndDisplay("No WiFi devices in AP Mode found");
   } else {
     Serial.print("Found "); Serial.print(scanResults); Serial.println(" devices ");
-    display.print("Found "); display.print(scanResults); display.println(" devices ");
+    String dispOut = "Found " + String(scanResults) + " devices ";
+    clearAndDisplay(dispOut);
     for (int i = 0; i < scanResults; ++i) {
       // Print SSID and RSSI for each device found
       String SSID = WiFi.SSID(i);
@@ -108,28 +111,29 @@ void ScanForSlave() {
 
       if (PRINTSCANRESULTS) {
         Serial.print(i + 1);
-        display.print(i + 1);
+        display.print(i + 1); //display.display();
         Serial.print(": ");
-        display.print(": ");
+        display.print(": "); //display.display();
         Serial.print(SSID);
-        display.print(SSID);
+        display.print(SSID); //display.display();
         Serial.print(" (");
-        display.print(" (");
+        display.print(" ("); //display.display();
         Serial.print(RSSI);
-        display.print(RSSI);
+        display.print(RSSI); //display.display();
         Serial.print(")");
-        display.print(")");
+        display.print(")"); //display.display();
         Serial.println("");
-        display.println("");
+        display.println(""); display.display();
       }
       delay(10);
       // Check if the current device starts with `Slave`
       if (SSID.indexOf("Slave") == 0) {
         // SSID of interest
         Serial.println("Found a Slave.");
-        display.println("Found a Slave.");
+        clearAndDisplay("Found an RX.");
         Serial.print(i + 1); Serial.print(": "); Serial.print(SSID); Serial.print(" ["); Serial.print(BSSIDstr); Serial.print("]"); Serial.print(" ("); Serial.print(RSSI); Serial.print(")"); Serial.println("");
-        display.print(i + 1); display.print(": "); display.print(SSID); display.print(" ["); display.print(BSSIDstr); display.print("]"); display.print(" ("); display.print(RSSI); display.print(")"); display.println("");
+        //display.print(i + 1); display.print(": "); display.print(SSID); display.print(" ["); display.print(BSSIDstr); display.print("]"); display.print(" ("); display.print(RSSI); display.print(")"); display.println(""); display.display();
+        //delay(5000);
         // Get BSSID => Mac Address of the Slave
         int mac[6];
         if ( 6 == sscanf(BSSIDstr.c_str(), "%x:%x:%x:%x:%x:%x",  &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5] ) ) {
@@ -142,6 +146,7 @@ void ScanForSlave() {
         slave.encrypt = 0; // no encryption
 
         slaveFound = 1;
+        pairedRSSI = RSSI;
         // we are planning to have only one slave in this example;
         // Hence, break after we find one, to be a bit efficient
         break;
@@ -151,38 +156,38 @@ void ScanForSlave() {
 
   if (slaveFound) {
     Serial.println("Slave Found, processing..");
-    display.println("Slave Found, processing..");
+    clearAndDisplay("RX Found,\nProcessing...");
   } else {
     Serial.println("Slave Not Found, trying again.");
-    display.println("Slave Not Found, trying again.");
+    clearAndDisplay("RX Not Found,\nTrying Again.");
   }
 
   // clean up ram
   WiFi.scanDelete();
-  delay(10000);
+  delay(1000);
 }
 
 void deletePeer() {
   esp_err_t delStatus = esp_now_del_peer(slave.peer_addr);
   Serial.print("Slave Delete Status: ");
-  display.print("Slave Delete Status: ");
+  clearAndDisplay("Slave Delete Status: ");
   if (delStatus == ESP_OK) {
     // Delete success
-    Serial.println("Success");
-    display.println("Success");
+    Serial.println("Delete Success");
+    clearAndDisplay("Delete Success");
   } else if (delStatus == ESP_ERR_ESPNOW_NOT_INIT) {
     // How did we get so far!!
     Serial.println("ESPNOW Not Init");
-    display.println("ESPNOW Not Init");
+    display.println("ESPNOW Not Init"); display.display();
   } else if (delStatus == ESP_ERR_ESPNOW_ARG) {
     Serial.println("Invalid Argument");
-    display.println("Invalid Argument");
+    display.println("Invalid Argument"); display.display();
   } else if (delStatus == ESP_ERR_ESPNOW_NOT_FOUND) {
     Serial.println("Peer not found.");
-    display.println("Peer not found.");
+    display.println("Peer not found."); display.display();
   } else {
     Serial.println("Not sure what happened");
-    display.println("Not sure what happened");
+    display.println("Not sure what happened"); display.display();
   }
 }
 
@@ -195,13 +200,11 @@ bool manageSlave() {
     }
 
     Serial.print("Slave Status: ");
-    display.print("Slave Status: ");
     // check if the peer exists
     bool exists = esp_now_is_peer_exist(slave.peer_addr);
     if ( exists) {
       // Slave already paired.
       Serial.println("Already Paired");
-      display.println("Already Paired");
       return true;
     } else {
       // Slave not paired, attempt pair
@@ -209,39 +212,32 @@ bool manageSlave() {
       if (addStatus == ESP_OK) {
         // Pair success
         Serial.println("Pair success");
-        display.println("Pair success");
         return true;
       } else if (addStatus == ESP_ERR_ESPNOW_NOT_INIT) {
         // How did we get so far!!
         Serial.println("ESPNOW Not Init");
-        display.println("ESPNOW Not Init");
         return false;
       } else if (addStatus == ESP_ERR_ESPNOW_ARG) {
         Serial.println("Invalid Argument");
-        display.println("Invalid Argument");
         return false;
       } else if (addStatus == ESP_ERR_ESPNOW_FULL) {
         Serial.println("Peer list full");
-        display.println("Peer list full");
         return false;
       } else if (addStatus == ESP_ERR_ESPNOW_NO_MEM) {
         Serial.println("Out of memory");
-        display.println("Out of memory");
         return false;
       } else if (addStatus == ESP_ERR_ESPNOW_EXIST) {
         Serial.println("Peer Exists");
-        display.println("Peer Exists");
         return true;
       } else {
         Serial.println("Not sure what happened");
-        display.println("Not sure what happened");
         return false;
       }
     }
   } else {
     // No slave found to process
-    Serial.println("No Slave found to process");
-    display.println("No Slave found to process");
+    Serial.println("No RX found to process");
+    clearAndDisplay("No RX found to process");
     return false;
   }
 }
@@ -252,32 +248,33 @@ void sendData() {
   data++;
   const uint8_t *peer_addr = slave.peer_addr;
   Serial.print("Sending: "); Serial.println(data);
-  display.print("Sending: "); display.println(data);
+  // clearAndDisplay("Sending: " + String(data));
   esp_err_t result = esp_now_send(peer_addr, &data, sizeof(data));
   Serial.print("Send Status: ");
-  display.print("Send Status: ");
+  // display.print("Send Status: "); display.display();
   if (result == ESP_OK) {
-    Serial.println("Success");
-    display.println("Success");
+    Serial.println("Success!\nRSSI: " + String(pairedRSSI));
+    clearAndDisplay("Success!\nRSSI: " + String(pairedRSSI));
+    delay(5000);
   } else if (result == ESP_ERR_ESPNOW_NOT_INIT) {
     // How did we get so far!!
     Serial.println("ESPNOW not Init.");
-    display.println("ESPNOW not Init.");
+    display.println("ESPNOW not Init."); display.display();
   } else if (result == ESP_ERR_ESPNOW_ARG) {
     Serial.println("Invalid Argument");
-    display.println("Invalid Argument");
+    display.println("Invalid Argument"); display.display();
   } else if (result == ESP_ERR_ESPNOW_INTERNAL) {
     Serial.println("Internal Error");
-    display.println("Internal Error");
+    display.println("Internal Error"); display.display();
   } else if (result == ESP_ERR_ESPNOW_NO_MEM) {
     Serial.println("ESP_ERR_ESPNOW_NO_MEM");
-    display.println("ESP_ERR_ESPNOW_NO_MEM");
+    display.println("ESP_ERR_ESPNOW_NO_MEM"); display.display();
   } else if (result == ESP_ERR_ESPNOW_NOT_FOUND) {
     Serial.println("Peer not found.");
-    display.println("Peer not found.");
+    display.println("Peer not found."); display.display();
   } else {
     Serial.println("Not sure what happened");
-    display.println("Not sure what happened");
+    display.println("Not sure what happened"); display.display();
   }
 }
 
@@ -287,10 +284,11 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   snprintf(macStr, sizeof(macStr), "%02x:%02x:%02x:%02x:%02x:%02x",
            mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
   Serial.print("Last Packet Sent to: "); Serial.println(macStr);
+  //clearAndDisplay("Last Packet Sent to: " + String(macStr));
+  //delay(5000);
   Serial.print("Last Packet Send Status: "); Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
-  display.print("Last Packet Sent to: "); display.println(macStr);
-  display.print("Last Packet Send Status: "); display.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
-
+  //clearAndDisplay("Last Packet Send Status: \n"); display.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail"); display.display();
+  //delay(5000);
 }
 
 void setup() {
@@ -301,7 +299,7 @@ void setup() {
     for(;;); //infinite loop
   }
   display.clearDisplay();
-  display.setTextSize(1);
+  display.setTextSize(oledTxtSize);
   display.setTextColor(SSD1306_WHITE);
   display.setCursor(0, 0);
   clearAndDisplay("Hello World");
@@ -315,9 +313,9 @@ void setup() {
   clearAndDisplay("ESPNow/Basic/Master Example");
   // This is the mac address of the Master in Station Mode
   Serial.print("STA MAC: "); Serial.println(WiFi.macAddress());
-  display.print("STA MAC: "); display.println(WiFi.macAddress());
+  display.print("STA MAC: "); display.println(WiFi.macAddress()); display.display();
   Serial.print("STA CHANNEL "); Serial.println(WiFi.channel());
-  display.print("STA CHANNEL "); display.println(WiFi.channel());
+  display.print("STA CHANNEL "); display.println(WiFi.channel()); display.display();
   // Init ESPNow with a fallback logic
   InitESPNow();
   // Once ESPNow is successfully Init, we will register for Send CB to
